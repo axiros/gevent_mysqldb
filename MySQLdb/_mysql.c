@@ -56,6 +56,8 @@ PERFORMANCE OF THIS SOFTWARE.
 #define MyAlloc(s,t) (s *) t.tp_alloc(&t,0)
 #define MyFree(o) Py_TYPE(o)->tp_free((PyObject*)o)
 
+#include "_async.cpp"
+
 static PyObject *_mysql_MySQLError;
 static PyObject *_mysql_Warning;
 static PyObject *_mysql_Error;
@@ -262,14 +264,12 @@ _mysql_ResultObject_Initialize(
     self->conn = (PyObject *) conn;
     Py_INCREF(conn);
     self->use = use;
-    Py_BEGIN_ALLOW_THREADS ;
     if (use)
         result = mysql_use_result(&(conn->connection));
     else
-        result = mysql_store_result(&(conn->connection));
+        result = gevent_async_mysql_store_result(&(conn->connection));
     self->result = result;
     self->has_next = (char)mysql_more_results(&(conn->connection));
-    Py_END_ALLOW_THREADS ;
 
     self->encoding = _get_encoding(&(conn->connection));
     //fprintf(stderr, "encoding=%s\n", self->encoding);
@@ -484,7 +484,6 @@ _mysql_ConnectionObject_Initialize(
         PyErr_SetNone(PyExc_MemoryError);
         return -1;
     }
-    Py_BEGIN_ALLOW_THREADS ;
     self->open = 1;
     if (connect_timeout) {
         unsigned int timeout = connect_timeout;
@@ -533,10 +532,11 @@ _mysql_ConnectionObject_Initialize(
         mysql_options(&(self->connection), MYSQL_DEFAULT_AUTH, auth_plugin);
     }
 
-    conn = mysql_real_connect(&(self->connection), host, user, passwd, db,
+    mysql_options(&(self->connection), MYSQL_OPT_NONBLOCK, 0);
+
+    conn = gevent_async_mysql_real_connect(&(self->connection), host, user, passwd, db,
                   port, unix_socket, client_flag);
 
-    Py_END_ALLOW_THREADS ;
 
     if (ssl) {
         int i;
@@ -668,9 +668,7 @@ _mysql_ConnectionObject_close(
     PyObject *noargs)
 {
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    mysql_close(&(self->connection));
-    Py_END_ALLOW_THREADS
+    gevent_async_mysql_close(&(self->connection));
     self->open = 0;
     _mysql_ConnectionObject_clear(self);
     Py_RETURN_NONE;
@@ -724,9 +722,7 @@ _mysql_ConnectionObject_dump_debug_info(
 {
     int err;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_dump_debug_info(&(self->connection));
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_dump_debug_info(&(self->connection));
     if (err) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -742,9 +738,7 @@ _mysql_ConnectionObject_autocommit(
     int flag, err;
     if (!PyArg_ParseTuple(args, "i", &flag)) return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_autocommit(&(self->connection), flag);
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_autocommit(&(self->connection), flag);
     if (err) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -774,9 +768,7 @@ _mysql_ConnectionObject_commit(
 {
     int err;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_commit(&(self->connection));
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_commit(&(self->connection));
     if (err) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -791,9 +783,7 @@ _mysql_ConnectionObject_rollback(
 {
     int err;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_rollback(&(self->connection));
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_rollback(&(self->connection));
     if (err) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -818,9 +808,7 @@ _mysql_ConnectionObject_next_result(
 {
     int err;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_next_result(&(self->connection));
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_next_result(&(self->connection));
     if (err > 0) return _mysql_Exception(self);
     return PyLong_FromLong(err);
 }
@@ -842,9 +830,7 @@ _mysql_ConnectionObject_set_server_option(
     if (!PyArg_ParseTuple(args, "i", &flags))
         return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_set_server_option(&(self->connection), flags);
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_set_server_option(&(self->connection), flags);
     if (err) return _mysql_Exception(self);
     return PyLong_FromLong(err);
 }
@@ -1313,11 +1299,9 @@ _mysql__fetch_row(
     for (i = skiprows; i<(skiprows+maxrows); i++) {
         PyObject *v;
         if (!self->use)
-            row = mysql_fetch_row(self->result);
+            row = gevent_async_mysql_fetch_row(self->result);
         else {
-            Py_BEGIN_ALLOW_THREADS;
-            row = mysql_fetch_row(self->result);
-            Py_END_ALLOW_THREADS;
+            row = gevent_async_mysql_fetch_row(self->result);
         }
         if (!row && mysql_errno(&(((_mysql_ConnectionObject *)(self->conn))->connection))) {
             _mysql_Exception((_mysql_ConnectionObject *)self->conn);
@@ -1442,9 +1426,7 @@ _mysql_ConnectionObject_change_user(
                      kwlist, &user, &pwd, &db))
         return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-        r = mysql_change_user(&(self->connection), user, pwd, db);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_change_user(&(self->connection), user, pwd, db);
     if (r)     return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1479,9 +1461,7 @@ _mysql_ConnectionObject_set_character_set(
     int err;
     if (!PyArg_ParseTuple(args, "s", &s)) return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    err = mysql_set_character_set(&(self->connection), s);
-    Py_END_ALLOW_THREADS
+    err = gevent_async_mysql_set_character_set(&(self->connection), s);
     if (err) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1654,9 +1634,7 @@ _mysql_ConnectionObject_insert_id(
 {
     my_ulonglong r;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
     r = mysql_insert_id(&(self->connection));
-    Py_END_ALLOW_THREADS
     return PyLong_FromUnsignedLongLong(r);
 }
 
@@ -1673,9 +1651,7 @@ _mysql_ConnectionObject_kill(
     int r;
     if (!PyArg_ParseTuple(args, "k:kill", &pid)) return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_kill(&(self->connection), pid);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_kill(&(self->connection), pid);
     if (r) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1767,9 +1743,7 @@ _mysql_ConnectionObject_ping(
         my_bool recon = (my_bool)reconnect;
         mysql_options(&self->connection, MYSQL_OPT_RECONNECT, &recon);
     }
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_ping(&(self->connection));
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_ping(&(self->connection));
     if (r)     return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1791,9 +1765,7 @@ _mysql_ConnectionObject_query(
     if (!PyArg_ParseTuple(args, "s#:query", &query, &len)) return NULL;
     check_connection(self);
 
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_real_query(&(self->connection), query, len);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_real_query(&(self->connection), query, len);
     if (r) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1815,9 +1787,7 @@ _mysql_ConnectionObject_send_query(
     if (!PyArg_ParseTuple(args, "s#:query", &query, &len)) return NULL;
     check_connection(self);
 
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_send_query(mysql, query, len);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_send_query(mysql, query, len);
     if (r) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1835,9 +1805,7 @@ _mysql_ConnectionObject_read_query_result(
     MYSQL *mysql = &(self->connection);
     check_connection(self);
 
-    Py_BEGIN_ALLOW_THREADS
-    r = (int)mysql_read_query_result(mysql);
-    Py_END_ALLOW_THREADS
+    r = (int)gevent_async_mysql_read_query_result(mysql);
     if (r) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1863,9 +1831,7 @@ _mysql_ConnectionObject_select_db(
     int r;
     if (!PyArg_ParseTuple(args, "s:select_db", &db)) return NULL;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_select_db(&(self->connection), db);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_select_db(&(self->connection), db);
     if (r)     return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1882,9 +1848,7 @@ _mysql_ConnectionObject_shutdown(
 {
     int r;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    r = mysql_shutdown(&(self->connection), SHUTDOWN_DEFAULT);
-    Py_END_ALLOW_THREADS
+    r = gevent_async_mysql_shutdown(&(self->connection), SHUTDOWN_DEFAULT);
     if (r) return _mysql_Exception(self);
     Py_RETURN_NONE;
 }
@@ -1903,9 +1867,7 @@ _mysql_ConnectionObject_stat(
 {
     const char *s;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
-    s = mysql_stat(&(self->connection));
-    Py_END_ALLOW_THREADS
+    s = gevent_async_mysql_stat(&(self->connection));
     if (!s) return _mysql_Exception(self);
     return PyUnicode_FromString(s);
 }
@@ -1965,9 +1927,7 @@ _mysql_ConnectionObject_thread_id(
 {
     unsigned long pid;
     check_connection(self);
-    Py_BEGIN_ALLOW_THREADS
     pid = mysql_thread_id(&(self->connection));
-    Py_END_ALLOW_THREADS
     return PyLong_FromLong((long)pid);
 }
 
@@ -2675,6 +2635,10 @@ PyInit__mysql(void)
         return NULL;
     if (PyType_Ready(&_mysql_ResultObject_Type) < 0)
         return NULL;
+
+    if (import_gevent_objects() == -1) {
+        return NULL;
+    }
 
     module = PyModule_Create(&_mysqlmodule);
     if (!module) return module; /* this really should never happen */

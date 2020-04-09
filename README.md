@@ -1,6 +1,41 @@
-# mysqlclient
+# gevent_mysqldb
 
-[![Build Status](https://secure.travis-ci.org/PyMySQL/mysqlclient-python.png)](http://travis-ci.org/PyMySQL/mysqlclient-python)
+This is a fork of [mysqlclient](https://github.com/PyMySQL/mysqlclient-python) to support gevent.
+The purpose is to get the speed of a mysql C-library within a gevent application,
+but without the need to use a thread-pool.
+
+This is achieved by modifying `mysql.c` to use the
+[non blocking API](https://mariadb.com/kb/en/using-the-non-blocking-library/) of `libmariadb`.
+This API allows to customize the waiting for read/write events on a socket.
+*gevent_mysql* uses `gevent.socket.wait_read` and `gevent.socket.wait_write` to do so.
+
+
+## Known Limitations
+
+* DNS lookups do not happen in a non-blocking way.
+  This means that `MySQLdb.connect()` will not give control to another greenlet
+  while waiting for the DNS response.
+
+* The destructor for a `_mysql.Connection` does not happen in a non-blocking way
+  when the connection is still open. In that case the destructor calls implicitly
+  `mysql_close()` wich cannot be done in gevent friendly way.
+  Since switching a greenlet in the code path of garbage collection
+  is dangerous. Image the garbage collection is run by the *hub* greenlet. Then
+  the *hub* would switch to himself, which is not possible.
+  Recommendation: Call `conn.close()` always explicitly.
+
+* The destructor of `_mysql.result` could block other greenlets under the following circumstances.
+    * The result object was acquired via `conn.use_result()`.
+    * Not all rows from the result have been read by the application.
+
+  `conn.use_result()` gives a *lazy* result back. In case the application
+  did **not** consume all rows from this result the mysql-driver has to discard the remaining
+  rows. This discard (and all the involved network IO) does not happen in a non-blocking
+  way. Recommendation is to use `conn.store_result()`.
+  This applies also for `MySQLdb.SSCursor` and `MySQLdb.CursorUseResultMixIn`,
+  because the use `conn.use_result()` under the hood.
+
+# mysqlclient
 
 This is a fork of [MySQLdb1](https://github.com/farcepest/MySQLdb1).
 
@@ -26,28 +61,11 @@ Or when you have question about MySQL:
 
 ### Windows
 
-Building mysqlclient on Windows is very hard.
-But there are some binary wheels you can install easily.
+*gevent_mysqldb* hasn't been tested/build on windows yet.
 
 ### macOS (Homebrew)
 
-Install MySQL and mysqlclient:
-
-```
-# Assume you are activating Python 3 venv
-$ brew install mysql
-$ pip install mysqlclient
-```
-
-If you don't want to install MySQL server, you can use mysql-client instead:
-
-```
-# Assume you are activating Python 3 venv
-$ brew install mysql-client
-$ echo 'export PATH="/usr/local/opt/mysql-client/bin:$PATH"' >> ~/.bash_profile
-$ export PATH="/usr/local/opt/mysql-client/bin:$PATH"
-$ pip install mysqlclient
-```
+*gevent_mysqldb* hasn't been tested/build on macOS yet.
 
 ### Linux
 
@@ -55,18 +73,28 @@ $ pip install mysqlclient
 environment.  If you can see some error, you should fix it by yourself, or ask for
 support in some user forum.  Don't file a issue on the issue tracker.**
 
-You may need to install the Python 3 and MySQL development headers and libraries like so:
+You may need to install the Python 3 and [libmariadb](https://downloads.mariadb.org/connector-c/) development headers and libraries
 
-* `$ sudo apt-get install python3-dev default-libmysqlclient-dev build-essential`  # Debian / Ubuntu
-* `% sudo yum install python3-devel mysql-devel`  # Red Hat / CentOS
+#### Debian / Ubuntu
 
-Then you can install mysqlclient via pip now:
+`sudo apt-get install python3-setuptools python3-dev build-essential python3-gevent libmariadb-dev-compat`
+
+#### Fedora
+
+`sudo dnf install python3-setuptools python3-devel python3-gevent gcc-c++ mariadb-connector-c-devel`
+
+### RedHat 8 / CentOS 8
+
+`sudo yum install python3-setuptools python3-devel python3-gevent gcc-c++ mariadb-connector-c-devel mariadb-devel`
+
+
+Then you can install *gevent_mysqldb* via pip now:
 
 ```
-$ pip install mysqlclient
+pip3 install git+https://github.com/axiros/gevent_mysqldb.git
+
 ```
 
 ### Documentation
 
 Documentation is hosted on [Read The Docs](https://mysqlclient.readthedocs.io/)
-
