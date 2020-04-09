@@ -29,7 +29,7 @@ PERFORMANCE OF THIS SOFTWARE.
 #include "mysql.h"
 #include "mysqld_error.h"
 
-#if MYSQL_VERSION_ID >= 80000
+#if MYSQL_VERSION_ID >= 80000 && !__cplusplus
 // https://github.com/mysql/mysql-server/commit/eb821c023cedc029ca0b06456dfae365106bee84
 #define my_bool _Bool
 #endif
@@ -837,7 +837,8 @@ _mysql_ConnectionObject_set_server_option(
     _mysql_ConnectionObject *self,
     PyObject *args)
 {
-    int err, flags=0;
+    int err;
+    enum enum_mysql_set_option flags;
     if (!PyArg_ParseTuple(args, "i", &flags))
         return NULL;
     check_connection(self);
