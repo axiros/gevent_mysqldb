@@ -11,3 +11,4 @@ include site.cfg
 include setup_common.py
 include setup_posix.py
 include setup_windows.py
+include MySQLdb/_async.cpp
