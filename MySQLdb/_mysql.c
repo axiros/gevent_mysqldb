@@ -1427,6 +1427,8 @@ _mysql_ResultObject_fetch_row(
     static char *kwlist[] = {"maxrows", "how", NULL };
     int maxrows=1, how=0;
     PyObject *r=NULL;
+    PyObject *t;
+    Py_ssize_t rowsadded;
 
     if (!PyArg_ParseTupleAndKeywords(args, kwargs, "|ii:fetch_row", kwlist,
                      &maxrows, &how))
@@ -1445,13 +1447,13 @@ _mysql_ResultObject_fetch_row(
         }
     }
     if (!(r = PyList_New(0))) goto error;
-    Py_ssize_t rowsadded = _mysql__fetch_row(self, r, maxrows, how);
+    rowsadded = _mysql__fetch_row(self, r, maxrows, how);
     if (rowsadded == -1) goto error;
 
     /* DB-API allows return rows as list.
      * But we need to return list because Django expecting tuple.
      */
-    PyObject *t = PyList_AsTuple(r);
+    t = PyList_AsTuple(r);
     Py_DECREF(r);
     return t;
   error:
