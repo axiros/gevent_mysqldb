@@ -1,11 +1,11 @@
-import mock
-import unittest
-from time import gmtime
 from datetime import time, date, datetime, timedelta
+from time import gmtime
+import unittest
+from unittest import mock
+import warnings
 
 from MySQLdb import times
 
-import warnings
 
 warnings.simplefilter("ignore")
 
@@ -106,14 +106,14 @@ class TestTicks(unittest.TestCase):
 
 class TestToLiteral(unittest.TestCase):
     def test_datetime_to_literal(self):
-        self.assertEquals(
+        self.assertEqual(
             times.DateTime2literal(datetime(2015, 12, 13), ""), b"'2015-12-13 00:00:00'"
         )
-        self.assertEquals(
+        self.assertEqual(
             times.DateTime2literal(datetime(2015, 12, 13, 11, 12, 13), ""),
             b"'2015-12-13 11:12:13'",
         )
-        self.assertEquals(
+        self.assertEqual(
             times.DateTime2literal(datetime(2015, 12, 13, 11, 12, 13, 123456), ""),
             b"'2015-12-13 11:12:13.123456'",
         )
@@ -136,11 +136,11 @@ class TestFormat(unittest.TestCase):
 
     def test_format_timestamp(self):
         assert times.format_TIMESTAMP(datetime(2015, 2, 3)) == "2015-02-03 00:00:00"
-        self.assertEquals(
+        self.assertEqual(
             times.format_TIMESTAMP(datetime(2015, 2, 3, 17, 18, 19)),
             "2015-02-03 17:18:19",
         )
-        self.assertEquals(
+        self.assertEqual(
             times.format_TIMESTAMP(datetime(15, 2, 3, 17, 18, 19)),
             "0015-02-03 17:18:19",
         )

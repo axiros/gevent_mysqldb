@@ -32,11 +32,11 @@ This API allows to customize the waiting for read/write events on a socket.
   because the use `conn.use_result()` under the hood.
 
 # mysqlclient
+This project is a fork of [MySQLdb1](https://github.com/farcepest/MySQLdb1).
+This project adds Python 3 support and fixed many bugs.
 
-This is a fork of [MySQLdb1](https://github.com/farcepest/MySQLdb1).
-
-This project adds Python 3 support and bug fixes.
-I hope this fork is merged back to MySQLdb1 like distribute was merged back to setuptools.
+* PyPI: https://pypi.org/project/mysqlclient/
+* GitHub: https://github.com/PyMySQL/mysqlclient
 
 
 ## Support
@@ -89,6 +89,20 @@ Then you can install *gevent_mysqldb* via pip now:
 ```
 pip3 install git+https://github.com/axiros/gevent_mysqldb.git
 
+```
+
+### Customize build (POSIX)
+
+mysqlclient uses `mysql_config` or `mariadb_config` by default for finding
+compiler/linker flags.
+
+You can use `MYSQLCLIENT_CFLAGS` and `MYSQLCLIENT_LDFLAGS` environment
+variables to customize compiler/linker options.
+
+```
+$ export MYSQLCLIENT_CFLAGS=`pkg-config mysqlclient --cflags`
+$ export MYSQLCLIENT_LDFLAGS=`pkg-config mysqlclient --libs`
+$ pip install mysqlclient
 ```
 
 ### Documentation

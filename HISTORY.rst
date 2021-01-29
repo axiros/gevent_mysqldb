@@ -1,12 +1,42 @@
 ======================
+ What's new in 2.0.3
+======================
+
+Release: 2021-01-01
+
+* Add ``-std=c99`` option to cflags by default for ancient compilers that doesn't
+  accept C99 by default.
+* You can customize cflags and ldflags by setting ``MYSQLCLIENT_CFLAGS`` and
+  ``MYSQLCLIENT_LDFLAGS``. It overrides ``mysql_config``.
+
+======================
+ What's new in 2.0.2
+======================
+
+Release: 2020-12-10
+
+* Windows: Update MariaDB Connector/C to 3.1.11.
+* Optimize fetching many rows with DictCursor.
+
+======================
+ What's new in 2.0.1
+======================
+
+Release: 2020-07-03
+
+* Fixed multithread safety issue in fetching row.
+* Removed obsolete members from Cursor. (e.g. `messages`, `_warnings`, `_last_executed`)
+
+======================
  What's new in 2.0.0
 ======================
 
-Release: TBD
+Release: 2020-07-02
 
 * Dropped Python 2 support
 * Dropped Django 1.11 support
 * Add context manager interface to Connection which closes the connection on ``__exit__``.
+* Add ``ssl_mode`` option.
 
 
 ======================
