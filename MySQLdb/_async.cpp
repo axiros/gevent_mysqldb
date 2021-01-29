@@ -1,5 +1,6 @@
 #include <type_traits>
 #include <utility>
+#include <string>
 #include "mysql.h"
 
 /* All helper functions are prefixed with async_ext */
@@ -10,6 +11,7 @@ static MYSQL* async_ext_get_mysql(MYSQL_RES* res) {return res->handle; }
 static PyObject* gevent_wait_read;
 static PyObject* gevent_wait_write;
 static PyObject* gevent_socket_timeout;
+static PyObject* py_async_resolve_host;
 
 
 static int
@@ -18,6 +20,7 @@ import_gevent_objects()
     PyObject* mod = NULL;
     gevent_wait_read = NULL;
     gevent_wait_write = NULL;
+    py_async_resolve_host = NULL;
 
     if ((mod = PyImport_ImportModule("gevent.socket")) == NULL) {
         goto error;
@@ -39,6 +42,17 @@ import_gevent_objects()
     }
 
     Py_DECREF(mod);
+
+    if ((mod = PyImport_ImportModule("MySQLdb.async")) == NULL) {
+        goto error;
+    }
+
+    py_async_resolve_host = PyObject_GetAttrString(mod, "resolve_host");
+    if (py_async_resolve_host == NULL) {
+        goto error;
+    }
+
+    Py_DECREF(mod);
     return 0;
 
 error:
@@ -46,6 +60,7 @@ error:
     Py_XDECREF(gevent_wait_read);
     Py_XDECREF(gevent_wait_write);
     Py_XDECREF(gevent_socket_timeout);
+    Py_XDECREF(py_async_resolve_host);
     return -1;
 }
 
@@ -214,4 +229,30 @@ gevent_async_mysql_stat(MYSQL* conn) {
         mysql_stat_cont,
         conn
     );
+}
+
+static std::string
+async_resolve_host(const char* orig_host, unsigned int port, int timeout) {
+
+    PyObject* py_new_host = PyObject_CallFunction(
+        py_async_resolve_host,
+        "sIi",
+        orig_host,
+        port ? port : 3306,
+        timeout ? timeout: 30
+    );
+
+    if (py_new_host == NULL) {
+        return std::string{};
+    }
+
+    const char* new_host_ptr = PyUnicode_AsUTF8(py_new_host);
+    if (new_host_ptr == NULL) {
+        Py_DECREF(py_new_host);
+        return std::string{};
+    }
+
+    const auto new_host = std::string(new_host_ptr);
+    Py_DECREF(py_new_host);
+    return new_host;
 }

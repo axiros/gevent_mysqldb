@@ -12,10 +12,6 @@ This API allows to customize the waiting for read/write events on a socket.
 
 ## Known Limitations
 
-* DNS lookups do not happen in a non-blocking way.
-  This means that `MySQLdb.connect()` will not give control to another greenlet
-  while waiting for the DNS response.
-
 * The destructor for a `_mysql.Connection` does not happen in a non-blocking way
   when the connection is still open. In that case the destructor calls implicitly
   `mysql_close()` wich cannot be done in gevent friendly way.

@@ -455,6 +455,11 @@ _mysql_ConnectionObject_Initialize(
     ))
         return -1;
 
+    const std::string server_ip = async_resolve_host(host, port, connect_timeout);
+    if (server_ip.empty()) {
+        return -1;
+    }
+
 #define _stringsuck(d,t,s) {t=PyMapping_GetItemString(s,#d);\
         if(t){d=PyUnicode_AsUTF8(t);ssl_keepref[n_ssl_keepref++]=t;}\
         PyErr_Clear();}
@@ -534,7 +539,7 @@ _mysql_ConnectionObject_Initialize(
 
     mysql_options(&(self->connection), MYSQL_OPT_NONBLOCK, 0);
 
-    conn = gevent_async_mysql_real_connect(&(self->connection), host, user, passwd, db,
+    conn = gevent_async_mysql_real_connect(&(self->connection), server_ip.c_str(), user, passwd, db,
                   port, unix_socket, client_flag);
 
 
